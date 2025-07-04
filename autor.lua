@@ -7,7 +7,7 @@ local RunService = game:GetService("RunService")
 local MaxMoveDistance = 50
 local MinBallSpeed = 47
 local Delay = 65
-local MoveSpeedMultiplier = 3  
+local MoveSpeedMultiplier = 36 
 local AutoRecEnabled = false
 
 local ScreenGui = Instance.new("ScreenGui")
