@@ -7,7 +7,7 @@ local RunService = game:GetService("RunService")
 local MaxMoveDistance = 50
 local MinBallSpeed = 47
 local Delay = 65
-local MoveSpeedMultiplier = 36 
+local MoveSpeed = 120
 local AutoRecEnabled = false
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -66,48 +66,30 @@ local function PHYSICS_STUFF(velocity, position)
 end
 
 
--- Улучшенная система передвижения
-local function MoveFastToPosition(targetPosition)
-    if not Character or not HumanoidRootPart then return end
+-- Система быстрого перемещения
+local function InstantMoveTo(target)
+    if not HumanoidRootPart then return end
     
-    local direction = (targetPosition - HumanoidRootPart.Position).Unit
-    local distance = (targetPosition - HumanoidRootPart.Position).Magnitude
+    -- Создаем BodyVelocity для мгновенного ускорения
+    local bv = HumanoidRootPart:FindFirstChild("AutoRecBV") or Instance.new("BodyVelocity")
+    bv.Name = "AutoRecBV"
+    bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    bv.Velocity = (target - HumanoidRootPart.Position).Unit * MoveSpeed
+    bv.P = 10000
+    bv.Parent = HumanoidRootPart
     
-    -- Устанавливаем высокую скорость перемещения
-    Humanoid.WalkSpeed = 32 * MoveSpeedMultiplier
-    
-    -- Используем BodyVelocity для точного контроля
-    if not HumanoidRootPart:FindFirstChild("AutoRecVelocity") then
-        local bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.Name = "AutoRecVelocity"
-        bodyVelocity.MaxForce = Vector3.new(4000, 0, 4000)
-        bodyVelocity.Velocity = direction * (Humanoid.WalkSpeed * 1.5)
-        bodyVelocity.P = 1000
-        bodyVelocity.Parent = HumanoidRootPart
-    else
-        HumanoidRootPart.AutoRecVelocity.Velocity = direction * (Humanoid.WalkSpeed * 1.5)
-    end
-    
-    -- Останавливаемся при приближении
-    if distance < 3 then
-        if HumanoidRootPart:FindFirstChild("AutoRecVelocity") then
-            HumanoidRootPart.AutoRecVelocity:Destroy()
-        end
+    -- Остановка при достижении цели
+    if (HumanoidRootPart.Position - target).Magnitude < 2 then
+        bv:Destroy()
         HumanoidRootPart.Velocity = Vector3.new(0, HumanoidRootPart.Velocity.Y, 0)
     end
-end
-
--- Проверка скорости мяча
-local function IsBallFastEnough(ballModel)
-    if not ballModel:FindFirstChild("Velocity") then return false end
-    return ballModel.Velocity.Value.Magnitude >= MinBallSpeed
 end
 
 -- Основной цикл
 RunService.Heartbeat:Connect(function()
     if not AutoRecEnabled then 
-        if HumanoidRootPart:FindFirstChild("AutoRecVelocity") then
-            HumanoidRootPart.AutoRecVelocity:Destroy()
+        if HumanoidRootPart and HumanoidRootPart:FindFirstChild("AutoRecBV") then
+            HumanoidRootPart.AutoRecBV:Destroy()
         end
         return 
     end
@@ -119,19 +101,20 @@ RunService.Heartbeat:Connect(function()
                 local landingPos = CalculateLandingPosition(ballModel.Velocity.Value, ball.Position)
                 Marker.CFrame = CFrame.new(landingPos)
                 
-                if IsBallFastEnough(ballModel) and (HumanoidRootPart.Position - landingPos).Magnitude <= MaxMoveDistance then
+                local distance = (HumanoidRootPart.Position - landingPos).Magnitude
+                if ballModel.Velocity.Value.Magnitude >= MinBallSpeed and distance <= MaxMoveDistance then
                     task.wait(Delay/1000)
-                    MoveFastToPosition(landingPos)
+                    InstantMoveTo(landingPos)
                 end
             end
         end
     end
 end)
 
--- Очистка при выходе
+-- Очистка
 Player.CharacterRemoving:Connect(function()
-    if HumanoidRootPart and HumanoidRootPart:FindFirstChild("AutoRecVelocity") then
-        HumanoidRootPart.AutoRecVelocity:Destroy()
+    if HumanoidRootPart and HumanoidRootPart:FindFirstChild("AutoRecBV") then
+        HumanoidRootPart.AutoRecBV:Destroy()
     end
 end)
         end
