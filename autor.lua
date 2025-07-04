@@ -1,8 +1,7 @@
 local Player = game:GetService("Players").LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local MaxMoveDistance = 50
@@ -47,14 +46,6 @@ AutoRecButton.MouseButton1Click:Connect(function()
     AutoRecButton.BackgroundColor3 = AutoRecEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
-
-repeat wait() until workspace:FindFirstChild("Ball")
-
--- Constants
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-
--- Marker
 local Marker = Instance.new("Part")
 Marker.Name = "Marker"
 Marker.Size = Vector3.new(2, 2, 2)
@@ -66,37 +57,24 @@ Marker.Parent = workspace
 Marker.Transparency = 1
 Marker.Material = Enum.Material.Neon
 
--- Physics
 local function PHYSICS_STUFF(velocity, position)
     local acceleration = -workspace.Gravity
-    local timeToLand = (-velocity.y - math.sqrt(velocity.y * velocity.y - 4 * 0.5 * acceleration * position.y)) / (2 * 0.5 * acceleration)
+    local timeToLand = (-velocity.y - math.sqrt(velocity.y^2 - 2 * acceleration * position.y)) / acceleration
     local horizontalVelocity = Vector3.new(velocity.x, 0, velocity.z)
-    local landingPosition = position + horizontalVelocity * timeToLand + Vector3.new(0, -position.y, 0)
-    return landingPosition
+    return position + horizontalVelocity * timeToLand + Vector3.new(0, -position.y, 0)
 end
 
--- Construct
-RunService:BindToRenderStep("VisualizeLandingPosition", Enum.RenderPriority.Camera.Value, function()
-    Marker.Transparency = 0.5
-    for _, ballModel in ipairs(workspace:GetChildren()) do
-        if ballModel:IsA("Model") and ballModel.Name == "Ball" then
-            local ball = ballModel:FindFirstChild("BallPart")
-            if ball then
-                local initialVelocity = ballModel.Velocity
-                local landingPosition = PHYSICS_STUFF(initialVelocity.Value, ball.Position)
-                Marker.CFrame = CFrame.new(landingPosition)
-            end
-        end
+local function MoveToPosition(targetPosition)
+    if not Character or not HumanoidRootPart then return end
+    
+    local direction = (targetPosition - HumanoidRootPart.Position).Unit
+    local distance = (targetPosition - HumanoidRootPart.Position).Magnitude
+    
+    if distance > 5 then
+        HumanoidRootPart.Velocity = direction * Humanoid.WalkSpeed
+    else
+        HumanoidRootPart.Velocity = Vector3.new(0, HumanoidRootPart.Velocity.Y, 0)
     end
-end
-
-local function MoveToPosition(position)
-    if not Character or not Humanoid then return end
-    Humanoid:MoveTo(position)
-end
-
-local function CheckDistance(position)
-    return (Character.HumanoidRootPart.Position - position).Magnitude <= MaxMoveDistance
 end
 
 local function CheckBallSpeed(ballModel)
@@ -106,13 +84,18 @@ end
 
 RunService.Heartbeat:Connect(function()
     if not AutoRecEnabled then return end
-    local marker = workspace:FindFirstChild("Marker")
-    if not marker then return end
+    
     for _, ballModel in ipairs(workspace:GetChildren()) do
         if ballModel:IsA("Model") and ballModel.Name == "Ball" then
-            if CheckBallSpeed(ballModel) and CheckDistance(marker.Position) then
-                task.wait(Delay / 1000)
-                MoveToPosition(marker.Position)
+            local ball = ballModel:FindFirstChild("BallPart")
+            if ball and ballModel:FindFirstChild("Velocity") then
+                local landingPos = PHYSICS_STUFF(ballModel.Velocity.Value, ball.Position)
+                Marker.CFrame = CFrame.new(landingPos)
+                
+                if CheckBallSpeed(ballModel) and (HumanoidRootPart.Position - landingPos).Magnitude <= MaxMoveDistance then
+                    task.wait(Delay/1000)
+                    MoveToPosition(landingPos)
+                end
             end
         end
     end
